@@ -28,34 +28,35 @@ A robust, production-ready Node.js and PostgreSQL backend designed to schedule, 
 
 ### 1. Clone & Install
 ```bash
-git clone <your-github-repo-url-here>
-cd content-broadcasting-backend
+git clone https://github.com/abhisoni7654/content-broadcasting-api.git
+cd content-broadcasting-api
 npm install
 
 2. Environment Variables
 
 Create a .env file in the root directory and configure the following:
-Code snippet
+<img width="444" height="106" alt="image" src="https://github.com/user-attachments/assets/35ed9d18-0d10-4d29-8286-662438dd4319" />
+
 
 PORT=5000
 NODE_ENV=development
 
 # Database Configuration
 DB_USER=postgres
-DB_PASSWORD=your_secure_password
+DB_PASSWORD=your_database_password
 DB_HOST=localhost
 DB_PORT=5432
 DB_NAME=broadcasting_db
 
 # Security
-JWT_SECRET=your_super_secret_jwt_key
+JWT_SECRET=your_jwt_key
 JWT_EXPIRE=30d
 
 3. Database Setup
 
 Create the database and tables using the schema design provided in the project. You will need a users table and a content table with foreign key relations.
 4. Run the Server
-Bash
+npm run dev
 
 # Start the server
 node server.js

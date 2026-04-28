@@ -5,7 +5,13 @@ import contentRoutes from './routes/contentRoutes.js';
 import broadcastRoutes from './routes/broadcastRoutes.js';
 import { errorHandler } from './middlewares/errorHandler.js';
 import { apiLimiter } from './middlewares/rateLimiter.js';
+import fs from 'fs'; 
 
+
+const uploadDir = 'uploads';
+if (!fs.existsSync(uploadDir)) {
+    fs.mkdirSync(uploadDir, { recursive: true });
+}
 const app = express();
 
 app.use(cors());

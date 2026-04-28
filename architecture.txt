@@ -1,0 +1,86 @@
+=============================================================================
+             CONTENT BROADCASTING BACKEND - SYSTEM ARCHITECTURE
+=============================================================================
+
+1. SYSTEM DATA FLOW (Clean Architecture)
+-----------------------------------------------------------------------------
+[ Client Request ]
+       │
+       ▼
+[ Transport Layer ]       => Express.js Router (cors, json parsing)
+       │                     + express-rate-limit (DDoS & Brute-force protection)
+       ▼
+[ Middleware Layer ]      => Interceptors & Gatekeepers
+       │                     + authMiddleware (JWT decode, RBAC enforcement)
+       │                     + uploadMiddleware (Multer, MIME/Ext validation, Disk I/O)
+       ▼
+[ Controller Layer ]      => The Translators (authController, contentController, broadcastController)
+       │                     + Extracts data (req.body, req.file, req.user)
+       │                     + Orchestrated by global asyncHandler to catch promise rejections
+       │                     + Serializes data into standardized JSON HTTP responses
+       ▼
+[ Service Layer ]         => The Brains (authService, contentService)
+       │                     + Pure business logic decoupled from HTTP context
+       │                     + Cryptography (bcrypt hashing)
+       │                     + The Rotation Engine: Modulo time-series mathematics
+       ▼
+[ Data Access Layer ]     => The Models (userModel, contentModel)
+       │                     + Single responsibility: Database interaction
+       │                     + Executes raw, optimized, parameterized SQL queries
+       │                     + Defends against SQL injection
+       ▼
+[ Persistence Layer ]     => PostgreSQL Database (via pg Connection Pool)
+
+
+2. DATABASE SCHEMA (Relational)
+-----------------------------------------------------------------------------
+TABLE: users
+  id            UUID (PK)
+  name          VARCHAR(100)
+  email         VARCHAR(100) UNIQUE
+  password_hash VARCHAR(255)
+  role          VARCHAR(20) CHECK (role IN ('teacher', 'principal'))
+  created_at    TIMESTAMPTZ
+
+TABLE: content
+  id                UUID (PK)
+  title             VARCHAR(255)
+  subject           VARCHAR(100)
+  file_path         VARCHAR(255)
+  file_type         VARCHAR(50)
+  rotation_duration INTEGER DEFAULT 5
+  start_time        TIMESTAMPTZ
+  end_time          TIMESTAMPTZ
+  status            VARCHAR(20) DEFAULT 'pending'
+  uploaded_by       UUID (FK -> users.id)
+  approved_by       UUID (FK -> users.id) NULL
+  approved_at       TIMESTAMPTZ NULL
+  rejection_reason  TEXT NULL
+  created_at        TIMESTAMPTZ
+
+
+3. THE BROADCASTING ENGINE ALGORITHM (Phase 6)
+-----------------------------------------------------------------------------
+To achieve a deterministic rotation without background cron jobs, the API 
+resolves the current display state dynamically at the time of the request:
+
+  1. Query DB for content where: status = 'approved' AND start_time <= NOW <= end_time
+  2. Order results by: subject ASC, created_at ASC
+  3. Map objects to calculate durations in milliseconds
+  4. Math: totalCycleMs = SUM(all durationMs)
+  5. Math: elapsedMs = NOW() - StartOfCurrentDay()
+  6. Math: currentPosition = elapsedMs % totalCycleMs
+  7. Iterate through items; accumulator sums durations.
+  8. Return the first item where currentPosition < accumulator.
+
+
+4. ERROR HANDLING TOPOLOGY
+-----------------------------------------------------------------------------
+[ Route/Controller Error ] OR [ Unhandled Promise ]
+       │
+       ▼
+[ asyncHandler utility ] => Catches error, forwards to Express next(err)
+       │
+       ▼
+[ errorHandler middleware] => Centralized logging & standardizing 
+       │                      Sends formatted JSON { success: false, message: ... }

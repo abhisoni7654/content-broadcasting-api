@@ -1,69 +1,41 @@
-=============================================================================
-             CONTENT BROADCASTING BACKEND - SYSTEM ARCHITECTURE
-=============================================================================
+CONTENT BROADCASTING BACKEND - SYSTEM ARCHITECTURE
 
 1. SYSTEM DATA FLOW (Clean Architecture)
------------------------------------------------------------------------------
-[ Client Request ]
-       │
-       ▼
-[ Transport Layer ]       => Express.js Router (cors, json parsing)
-       │                     + express-rate-limit (DDoS & Brute-force protection)
-       ▼
-[ Middleware Layer ]      => Interceptors & Gatekeepers
-       │                     + authMiddleware (JWT decode, RBAC enforcement)
-       │                     + uploadMiddleware (Multer, MIME/Ext validation, Disk I/O)
-       ▼
-[ Controller Layer ]      => The Translators (authController, contentController, broadcastController)
-       │                     + Extracts data (req.body, req.file, req.user)
-       │                     + Orchestrated by global asyncHandler to catch promise rejections
-       │                     + Serializes data into standardized JSON HTTP responses
-       ▼
-[ Service Layer ]         => The Brains (authService, contentService)
-       │                     + Pure business logic decoupled from HTTP context
-       │                     + Cryptography (bcrypt hashing)
-       │                     + The Rotation Engine: Modulo time-series mathematics
-       ▼
-[ Data Access Layer ]     => The Models (userModel, contentModel)
-       │                     + Single responsibility: Database interaction
-       │                     + Executes raw, optimized, parameterized SQL queries
-       │                     + Defends against SQL injection
-       ▼
-[ Persistence Layer ]     => PostgreSQL Database (via pg Connection Pool)
+Client Request
+  -> Transport Layer: Express.js Router (cors, json parsing, rate-limit)
+  -> Middleware Layer: authMiddleware (JWT, RBAC), uploadMiddleware (Multer, MIME validation)
+  -> Controller Layer: Extracts data, orchestrated by asyncHandler, returns JSON
+  -> Service Layer: Core business logic, bcrypt hashing, time-series rotation math
+  -> Data Access Layer: Models executing raw, parameterized SQL queries
+  -> Persistence Layer: PostgreSQL Database
 
+2. DATABASE SCHEMA
+Table: users
+  id: UUID (PK)
+  name: VARCHAR(100)
+  email: VARCHAR(100) UNIQUE
+  password_hash: VARCHAR(255)
+  role: VARCHAR(20) [teacher or principal]
+  created_at: TIMESTAMPTZ
 
-2. DATABASE SCHEMA (Relational)
------------------------------------------------------------------------------
-TABLE: users
-  id            UUID (PK)
-  name          VARCHAR(100)
-  email         VARCHAR(100) UNIQUE
-  password_hash VARCHAR(255)
-  role          VARCHAR(20) CHECK (role IN ('teacher', 'principal'))
-  created_at    TIMESTAMPTZ
+Table: content
+  id: UUID (PK)
+  title: VARCHAR(255)
+  subject: VARCHAR(100)
+  file_path: VARCHAR(255)
+  file_type: VARCHAR(50)
+  rotation_duration: INTEGER (Default 5)
+  start_time: TIMESTAMPTZ
+  end_time: TIMESTAMPTZ
+  status: VARCHAR(20) (Default 'pending')
+  uploaded_by: UUID (FK -> users.id)
+  approved_by: UUID (FK -> users.id) NULL
+  approved_at: TIMESTAMPTZ NULL
+  rejection_reason: TEXT NULL
+  created_at: TIMESTAMPTZ
 
-TABLE: content
-  id                UUID (PK)
-  title             VARCHAR(255)
-  subject           VARCHAR(100)
-  file_path         VARCHAR(255)
-  file_type         VARCHAR(50)
-  rotation_duration INTEGER DEFAULT 5
-  start_time        TIMESTAMPTZ
-  end_time          TIMESTAMPTZ
-  status            VARCHAR(20) DEFAULT 'pending'
-  uploaded_by       UUID (FK -> users.id)
-  approved_by       UUID (FK -> users.id) NULL
-  approved_at       TIMESTAMPTZ NULL
-  rejection_reason  TEXT NULL
-  created_at        TIMESTAMPTZ
-
-
-3. THE BROADCASTING ENGINE ALGORITHM (Phase 6)
------------------------------------------------------------------------------
-To achieve a deterministic rotation without background cron jobs, the API 
-resolves the current display state dynamically at the time of the request:
-
+3. THE BROADCASTING ENGINE ALGORITHM
+To achieve deterministic rotation without background cron jobs, the API resolves the current display state dynamically:
   1. Query DB for content where: status = 'approved' AND start_time <= NOW <= end_time
   2. Order results by: subject ASC, created_at ASC
   3. Map objects to calculate durations in milliseconds
@@ -73,14 +45,47 @@ resolves the current display state dynamically at the time of the request:
   7. Iterate through items; accumulator sums durations.
   8. Return the first item where currentPosition < accumulator.
 
-
 4. ERROR HANDLING TOPOLOGY
------------------------------------------------------------------------------
-[ Route/Controller Error ] OR [ Unhandled Promise ]
-       │
-       ▼
-[ asyncHandler utility ] => Catches error, forwards to Express next(err)
-       │
-       ▼
-[ errorHandler middleware] => Centralized logging & standardizing 
-       │                      Sends formatted JSON { success: false, message: ... }
+Route/Controller Error -> caught by asyncHandler utility -> forwarded to errorHandler middleware -> returns standardized JSON { success: false, message: ... }
+
+5. TECHNOLOGY STACK
+Runtime: Node.js (v18+)
+Framework: Express.js
+Database: PostgreSQL
+DB Driver: pg (Connection pooling)
+Authentication: JSON Web Tokens (JWT) + bcryptjs
+File Storage: Multer (DiskStorage)
+Security: express-rate-limit, cors
+
+6. SECURITY & ACCESS CONTROL (RBAC)
+Role: Public
+  - View active broadcast (GET /api/broadcast/live/:id)
+Role: Teacher
+  - Upload content, set schedules (POST /api/content/upload)
+Role: Principal
+  - Audit pending content (GET /api/content/pending)
+  - Approve/Reject (PATCH /api/content/:id/review)
+
+7. API ROUTING TOPOLOGY
+/api/auth
+  POST /register (Public)
+  POST /login (Public)
+
+/api/content
+  POST /upload (Protected: Teacher)
+  GET /pending (Protected: Principal)
+  PATCH /:id/review (Protected: Principal)
+
+/api/broadcast
+  GET /live/:teacherId (Public)
+
+8. DIRECTORY STRUCTURE
+src/
+  config/        - Environment variables and DB pool
+  controllers/   - Request/Response formatting
+  middlewares/   - Auth guards, File interceptors, Error catchers
+  models/        - Data Access Layer (SQL queries)
+  routes/        - HTTP endpoints
+  services/      - Algorithms and business logic
+  utils/         - Helper functions
+  app.js         - Express setup

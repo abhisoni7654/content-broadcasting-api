@@ -2,6 +2,8 @@
 
 A robust, production-ready Node.js and PostgreSQL backend designed to schedule, manage, and broadcast educational content to classroom displays. It features a deterministic, time-series rotation engine, strict Role-Based Access Control (RBAC), and a clean architectural design.
 
+**🌐 Live Here:** [https://content-broadcasting-api-fpz6.onrender.com](https://content-broadcasting-api-fpz6.onrender.com)
+
 ## ✨ Key Features
 
 * **Mathematical Rotation Engine:** Utilizes modulo arithmetic against an epoch baseline to continuously resolve the active broadcast state per subject without cron jobs or background workers.
@@ -23,21 +25,25 @@ A robust, production-ready Node.js and PostgreSQL backend designed to schedule, 
 ## 🚀 Getting Started
 
 ### Prerequisites
+
 * Node.js (v16+ recommended)
 * PostgreSQL running locally or remotely
 
 ### 1. Clone & Install
+
 ```bash
 git clone https://github.com/abhisoni7654/content-broadcasting-api.git
 cd content-broadcasting-api
 npm install
 
-2. Environment Variables
+```
 
-Create a .env file in the root directory and configure the following:
-<img width="444" height="106" alt="image" src="https://github.com/user-attachments/assets/35ed9d18-0d10-4d29-8286-662438dd4319" />
+### 2. Environment Variables
+
+Create a `.env` file in the root directory and configure the following:
 
 
+```env
 PORT=5000
 NODE_ENV=development
 
@@ -52,37 +58,43 @@ DB_NAME=broadcasting_db
 JWT_SECRET=your_jwt_key
 JWT_EXPIRE=30d
 
-3. Database Setup
+```
+
+### 3. Database Setup
 
 Create the database and tables using the schema design provided in the project. You will need a users table and a content table with foreign key relations.
-4. Run the Server
+
+### 4. Run the Server
+
+```bash
+# Run in development mode
 npm run dev
 
-# Start the server
+# Or start the server normally
 node server.js
 
-📡 API Reference
-Auth Routes (Rate Limited)
+```
 
-    POST /api/auth/register - Register a new Teacher or Principal
+## 📡 API Reference
 
-    POST /api/auth/login - Authenticate and receive JWT
+**Auth Routes (Rate Limited)**
 
-Content Routes (Protected)
+* `POST /api/auth/register` - Register a new Teacher or Principal
+* `POST /api/auth/login` - Authenticate and receive JWT
 
-    POST /api/content/upload - Upload new content (Teacher only)
+**Content Routes (Protected)**
 
-    GET /api/content/pending - View content awaiting approval (Principal only)
+* `POST /api/content/upload` - Upload new content (Teacher only)
+* `GET /api/content/pending` - View content awaiting approval (Principal only)
+* `PATCH /api/content/:id/review` - Approve or reject content (Principal only)
 
-    PATCH /api/content/:id/review - Approve or reject content (Principal only)
+**Broadcast Routes (Public)**
 
-Broadcast Routes (Public)
+* `GET /api/broadcast/live/:teacherId` - Fetches the currently active content for a specific teacher's screen based on time and rotation logic.
 
-    GET /api/broadcast/live/:teacherId - Fetches the currently active content for a specific teacher's screen based on time and rotation logic.
+## 🏗️ Folder Structure
 
-🏗️ Folder Structure
-Plaintext
-
+```plaintext
 src/
 ├── config/         # Database pool instantiation
 ├── controllers/    # I/O extraction and HTTP response formatting
@@ -91,3 +103,5 @@ src/
 ├── routes/         # Express endpoint definitions
 ├── services/       # Core business logic and rotation algorithms
 └── utils/          # Async wrappers
+
+```
